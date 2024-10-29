@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pylab as plt
 import pandas as pd
 
-import seaborn as sns
+#import seaborn as sns
 
 import atm
 
@@ -23,9 +23,9 @@ supress_warnings = True
 
 warnings.filterwarnings('ignore') 
 
-from SeqMetrics import nse, rmse, RegressionMetrics, plot_metrics, agreement_index, r2, mae, nrmse, pbias, mean_bias_error
+#from SeqMetrics import nse, rmse, RegressionMetrics, plot_metrics, agreement_index, r2, mae, nrmse, pbias, mean_bias_error
 
-from scipy import stats
+#from scipy import stats
 
 #################################################
 # Read Maktau AWS data and prepare model inputs #
@@ -36,9 +36,9 @@ met = pd.read_csv('Maktau_AWS_1h.dat')
 met = met.set_index(pd.to_datetime(met['Unnamed: 0']))
 met.index.name = ''
 
-smplot = pd.read_csv("Maktau5.csv")
+smplot = pd.read_csv("maktau_irrigation_vwc.csv")
 
-smplot = smplot.set_index(pd.to_datetime(smplot.Measurement_Time))
+smplot = smplot.set_index(pd.to_datetime(smplot.Date))
 
 # Incoming global radiation scaled to attain Net radiation
 
@@ -50,8 +50,8 @@ met['Rain_mm_Tot_corr'] = 1.07*met.Rain_mm_Tot
 
 met['et_pm'] = atm.et_penman(met.WS_ms_S_WVT, 90, met.vpd, met.AirTC_Avg, met.net_mod, met['soilf'], met.daytime, timestep=3600)
 
-dat = met
-
+per = slice('20240403','20240815')
+dat = met[per]
 dd = dat.resample("D").mean()
 
 dd['Precipitation'] = dat.resample("D").Rain_mm_Tot_corr.sum()
@@ -68,9 +68,13 @@ wdf = wdf.reset_index()
 
 wdf = wdf.drop([''], axis=1)
 
+print(wdf)
+
 #######################
 # Aquacrop simulation #
 #######################
+
+# Soil
 
 custom = Soil('custom', dz=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 
@@ -86,33 +90,31 @@ custom.add_layer(thickness=0.5, thWP=0.10, thFC=0.23, thS=0.42, Ksat=1000, penet
 
 # Initial water content
 
-initWC = InitialWaterContent(wc_type='Num', method='Layer', depth_layer=[1,2,3,4,5], value=[0.07,0.07,0.09,0.09,0.09])
-
-#initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['FC','FC','FC','FC','FC'])
-
-#initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['WP','WP','WP','WP','WP'])
+initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['FC','FC','FC','FC','FC'])
 
 
-period = slice('20160317','20160813')
+# Soil moisture in the plot
+
+sm_dd = smplot.resample("H").mean()
+
+sm_dd.to_csv('sm_dd.csv')
 
 # AWS soil moisture
+
+period = slice('20240403','20240815')
 
 dd_measured = dd[period]
 
 measured_met = dd_measured[['VWC_10cm_corr', 'VWC_30cm_corr', 'VWC_50cm_corr']]
 
-# Soil moisture in the plot
-
-sm_dd = smplot.resample("D").mean()[period]
-
-# Crop. Maktau Maize is DH02
+# Crop
 
 plant_row=11
 plants_per_row=15
 plant_population=(plant_row*plants_per_row)*100 # 100*100=10,000m**2=1ha
 
                
-maizeDH02=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
+maizePH1=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
                Emergence=6, Flowering=13, HIstart=66, YldForm=61, MaxRooting=108, Senescence=107, Maturity=132, HI0=0.48,
                Zmin=0.3, Zmax=1.0, PlantPop=39200, WP=33.7, CCx=0.88,                
                fshape_w1=2.9,fshape_w2=6.0, fshape_w3=2.7)
@@ -172,11 +174,11 @@ outputs_final_stats=[]
 #model = AquaCropModel(sim_start,sim_end,wdf,soil,crop,initial_water_content=initWC,
 #                      irrigation_management=IrrigationManagement(irrigation_method=5,))
 
-sim_start = '2016/03/17'
+sim_start = '2024/04/03'
 
-sim_end = '2016/08/13'
+sim_end = '2024/08/15'
 
-model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizeDH02,initial_water_content=initWC,
+model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizePH1,initial_water_content=initWC,
                       irrigation_management=irr_mngt) # create model 
 
 '''

@@ -36,9 +36,9 @@ met = pd.read_csv('Maktau_AWS_1h.dat')
 met = met.set_index(pd.to_datetime(met['Unnamed: 0']))
 met.index.name = ''
 
-smplot = pd.read_csv("Maktau5.csv")
+smplot = pd.read_csv("maktau_irrigation_plot.csv")
 
-smplot = smplot.set_index(pd.to_datetime(smplot.Measurement_Time))
+smplot = smplot.set_index(pd.to_datetime(smplot.Date))
 
 # Incoming global radiation scaled to attain Net radiation
 
@@ -72,6 +72,8 @@ wdf = wdf.drop([''], axis=1)
 # Aquacrop simulation #
 #######################
 
+# Soil
+
 custom = Soil('custom', dz=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 
 custom.add_layer(thickness=0.1, thWP=0.06, thFC=0.17, thS=0.45, Ksat=255, penetrability=100)
@@ -86,16 +88,13 @@ custom.add_layer(thickness=0.5, thWP=0.10, thFC=0.23, thS=0.42, Ksat=1000, penet
 
 # Initial water content
 
-initWC = InitialWaterContent(wc_type='Num', method='Layer', depth_layer=[1,2,3,4,5], value=[0.07,0.07,0.09,0.09,0.09])
+#initWC = InitialWaterContent(wc_type='Num', method='Layer', depth_layer=[1,2,3,4,5], value=[0.12,0.15,0.18,0.18,0.18])
 
-#initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['FC','FC','FC','FC','FC'])
-
-#initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['WP','WP','WP','WP','WP'])
-
-
-period = slice('20160317','20160813')
+initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['FC','FC','FC','FC','FC'])
 
 # AWS soil moisture
+
+period = slice('20240403','20240815')
 
 dd_measured = dd[period]
 
@@ -105,14 +104,16 @@ measured_met = dd_measured[['VWC_10cm_corr', 'VWC_30cm_corr', 'VWC_50cm_corr']]
 
 sm_dd = smplot.resample("D").mean()[period]
 
-# Crop. Maktau Maize is DH02
+sm_dd.to_csv('sm_dd.csv')
+
+# Crop. Maktau Maize is PH1
 
 plant_row=11
 plants_per_row=15
 plant_population=(plant_row*plants_per_row)*100 # 100*100=10,000m**2=1ha
 
                
-maizeDH02=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
+maizePH1=Crop('Maize', planting_date='04/03', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
                Emergence=6, Flowering=13, HIstart=66, YldForm=61, MaxRooting=108, Senescence=107, Maturity=132, HI0=0.48,
                Zmin=0.3, Zmax=1.0, PlantPop=39200, WP=33.7, CCx=0.88,                
                fshape_w1=2.9,fshape_w2=6.0, fshape_w3=2.7)
@@ -121,19 +122,15 @@ maizeDH02=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CG
 # Irrigation
 
 plot_area=100 #m**2
-emmiters=156
+emmiters=540
 emmiter_discharge=0.6 #L/hr
-irr_event_time=2 #hr
-wetted_area_radius=0.15
+irr_event_time=1 #hr
+wetted_area_radius=0.10
 wetted_area=np.pi*wetted_area_radius**2
 total_wetted_area=wetted_area*emmiters
 wetted_surface=(total_wetted_area/plot_area)*100
 irr_event_vol_emitter=emmiter_discharge*irr_event_time
 irr_depth = (((irr_event_vol_emitter*emmiters)/1000)/total_wetted_area)*1000
-
-print(irr_depth)
-
-irr_mngt = IrrigationManagement(irrigation_method=2,IrrInterval=3,WetSurf=wetted_surface,AppEff=90,MaxIrr=7)
 
 '''
 maize water stress level soil moisture content < 0.125 m3/m3
@@ -142,25 +139,32 @@ Depletion = 80% at 0.5m
 
 #custom irrigation strategy.
 # To showcase this feature, we will define a function that will irrigate according to the follwing logic:
-# 1) There will be no rain over the next 10 days -> Irrigate 10mm
-# 2) There will be rain in the next 10 days but the soil is over 70% depleted -> Irrigate 10mm
+# 1) There will be no rain over the next n days -> Irrigate n mm
+# 2) There will be rain in the next n days but the soil is over 70% depleted -> Irrigate n mm
 # 3) Otherwise -> No irrigation
 
-
+'''
 # function to return the irrigation depth to apply on next day
+
 def get_depth(model):    
     t = model._clock_struct.time_step_counter # current timestep
     # get weather data for next n days
-    weather10 = model._weather[t+1:min(t+3+1,len(model._weather))]
+    weather03 = model._weather[t+1:min(t+10+1,len(model._weather))]
+    print(weather03)
     # if it will rain in next n days
-    if sum(weather10[:,2])>0:
-        depth=0
+    if sum(weather03[:,2])>0:
+       # check if soil is over 80% depleted
+       if t>0 and model._init_cond.depletion/model._init_cond.taw > 0.8:
+           depth=5   
+       else:
+           depth=0
     else:
-        # no rain for next 10 days
-        depth=irr_depth
+        # no rain for next n days
+        depth=5
 
     return depth
-'''
+
+irr_mngt = IrrigationManagement(irrigation_method=5,WetSurf=wetted_surface,AppEff=90,MaxIrr=5)
 
 # Output labels
 
@@ -169,29 +173,25 @@ outputs_water_storage=[]
 outputs_crop_growth=[]
 outputs_final_stats=[]
 
-#model = AquaCropModel(sim_start,sim_end,wdf,soil,crop,initial_water_content=initWC,
-#                      irrigation_management=IrrigationManagement(irrigation_method=5,))
+sim_start = '2024/04/03'
 
-sim_start = '2016/03/17'
+sim_end = '2024/08/15'
 
-sim_end = '2016/08/13'
+model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizePH1,initial_water_content=initWC,
+                      irrigation_management=irr_mngt)
 
-model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizeDH02,initial_water_content=initWC,
-                      irrigation_management=irr_mngt) # create model 
-
-'''
 model._initialize()
 
-while model._clock_struct.model_is_finished is False:    
+while model._clock_struct.model_is_finished is False:
+
     # get depth to apply
+
     depth=get_depth(model)
     
     model._param_struct.IrrMngt.depth=depth
 
-    model.run_model(initialize_model=False)
+    model.run_model(initialize_model=False)    
 
-'''
-model.run_model(till_termination=True) # run model till the end
 outputs_water_flux.append(model._outputs.water_flux)
 outputs_water_storage.append(model._outputs.water_storage)
 outputs_crop_growth.append(model._outputs.crop_growth)
@@ -205,10 +205,9 @@ print(outputs_final)
 
 
 for i in range(len(outputs_water_flux)):
-    modelled_water_flux = pd.DataFrame(outputs_water_flux[i][['dap', 'Es', 'Tr']])
+    modelled_water_flux = pd.DataFrame(outputs_water_flux[i][['dap', 'IrrDay', 'Infl', 'Runoff', 'Es', 'Tr' ]])
 
-modelled_water_flux['modelled_ET'] = modelled_water_flux.Es + modelled_water_flux.Tr
-
+modelled_water_flux.to_csv('modelled_water_flux.csv')
     
 for i in range(len(outputs_water_storage)):
     modelled_water_storage = pd.DataFrame(outputs_water_storage[i][['th1', 'th2', 'th3', 'th5']])

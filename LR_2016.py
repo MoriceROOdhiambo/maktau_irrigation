@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pylab as plt
 import pandas as pd
 
-import seaborn as sns
+#import seaborn as sns
 
 import atm
 
@@ -23,9 +23,9 @@ supress_warnings = True
 
 warnings.filterwarnings('ignore') 
 
-from SeqMetrics import nse, rmse, RegressionMetrics, plot_metrics, agreement_index, r2, mae, nrmse, pbias, mean_bias_error
+#from SeqMetrics import nse, rmse, RegressionMetrics, plot_metrics, agreement_index, r2, mae, nrmse, pbias, mean_bias_error
 
-from scipy import stats
+#from scipy import stats
 
 #################################################
 # Read Maktau AWS data and prepare model inputs #
@@ -36,9 +36,9 @@ met = pd.read_csv('Maktau_AWS_1h.dat')
 met = met.set_index(pd.to_datetime(met['Unnamed: 0']))
 met.index.name = ''
 
-smplot = pd.read_csv("Maktau5.csv")
+#smplot = pd.read_csv("Maktau5.csv")
 
-smplot = smplot.set_index(pd.to_datetime(smplot.Measurement_Time))
+#smplot = smplot.set_index(pd.to_datetime(smplot.Measurement_Time))
 
 # Incoming global radiation scaled to attain Net radiation
 
@@ -50,9 +50,9 @@ met['Rain_mm_Tot_corr'] = 1.07*met.Rain_mm_Tot
 
 met['et_pm'] = atm.et_penman(met.WS_ms_S_WVT, 90, met.vpd, met.AirTC_Avg, met.net_mod, met['soilf'], met.daytime, timestep=3600)
 
-per = slice('20160301','20160801')
+per = slice('20160403','20160815')
 
-dat = met
+dat = met[per]
 
 dd = dat.resample("D").mean()
 
@@ -70,6 +70,8 @@ wdf = dd[['MinTemp', 'MaxTemp', 'Precipitation', 'ReferenceET' , 'Date']]
 wdf = wdf.reset_index()
 
 wdf = wdf.drop([''], axis=1)
+
+print(wdf)
 
 #######################
 # Aquacrop simulation #
@@ -106,7 +108,7 @@ measured_met = dd_measured[['VWC_10cm_corr', 'VWC_30cm_corr', 'VWC_50cm_corr']]
 
 # Soil moisture in the plot
 
-sm_dd = smplot.resample("D").mean()[period]
+#sm_dd = smplot.resample("D").mean()[period]
 
 # Crop. Maktau Maize is DH02
 
@@ -115,7 +117,7 @@ plants_per_row=15
 plant_population=(plant_row*plants_per_row)*100 # 100*100=10,000m**2=1ha
 
                
-maizeDH02=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
+maizeDH02=Crop('Maize', planting_date='04/03', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
                Emergence=6, Flowering=13, HIstart=66, YldForm=61, MaxRooting=108, Senescence=107, Maturity=132, HI0=0.48,
                Zmin=0.3, Zmax=1.0, PlantPop=39200, WP=33.7, CCx=0.88,                
                fshape_w1=2.9,fshape_w2=6.0, fshape_w3=2.7)
@@ -124,19 +126,23 @@ maizeDH02=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CG
 # Irrigation
 
 plot_area=100 #m**2
-emmiters=156
+lateral_lines=15
+emitters_per_lateral_line=35
+emmiters=lateral_lines*emitters_per_lateral_line
 emmiter_discharge=0.6 #L/hr
-irr_event_time=2 #hr
+irr_event_time=1 #hr
 wetted_area_radius=0.15
 wetted_area=np.pi*wetted_area_radius**2
 total_wetted_area=wetted_area*emmiters
 wetted_surface=(total_wetted_area/plot_area)*100
 irr_event_vol_emitter=emmiter_discharge*irr_event_time
-irr_depth = (((irr_event_vol_emitter*emmiters)/1000)/total_wetted_area)*1000
+total_irr_water=irr_event_vol_emitter*emmiters
+irr_depth = (((total_irr_water)/1000)/total_wetted_area)*1000
 
 print(irr_depth)
+print(total_irr_water)
 
-irr_mngt = IrrigationManagement(irrigation_method=2,IrrInterval=3,WetSurf=wetted_surface,AppEff=90,MaxIrr=7)
+irr_mngt = IrrigationManagement(irrigation_method=2,IrrInterval=3,WetSurf=wetted_surface,AppEff=90,MaxIrr=irr_depth)
 
 '''
 maize water stress level soil moisture content < 0.125 m3/m3
@@ -175,9 +181,9 @@ outputs_final_stats=[]
 #model = AquaCropModel(sim_start,sim_end,wdf,soil,crop,initial_water_content=initWC,
 #                      irrigation_management=IrrigationManagement(irrigation_method=5,))
 
-sim_start = '2016/03/17'
+sim_start = '2016/04/03'
 
-sim_end = '2016/08/13'
+sim_end = '2016/08/15'
 
 model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizeDH02,initial_water_content=initWC,
                       irrigation_management=irr_mngt) # create model 

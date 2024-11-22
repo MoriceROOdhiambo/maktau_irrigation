@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pylab as plt
 import pandas as pd
 
-import seaborn as sns
+#import seaborn as sns
 
 import atm
 
@@ -23,9 +23,9 @@ supress_warnings = True
 
 warnings.filterwarnings('ignore') 
 
-from SeqMetrics import nse, rmse, RegressionMetrics, plot_metrics, agreement_index, r2, mae, nrmse, pbias, mean_bias_error
+#from SeqMetrics import nse, rmse, RegressionMetrics, plot_metrics, agreement_index, r2, mae, nrmse, pbias, mean_bias_error
 
-from scipy import stats
+#from scipy import stats
 
 #################################################
 # Read Maktau AWS data and prepare model inputs #
@@ -36,7 +36,11 @@ met = pd.read_csv('Maktau_AWS_1h.dat')
 met = met.set_index(pd.to_datetime(met['Unnamed: 0']))
 met.index.name = ''
 
+<<<<<<< HEAD:LR_2024_2.py
 smplot = pd.read_csv("maktau_irrigation_plot.csv")
+=======
+smplot = pd.read_csv("maktau_irrigation_vwc.csv")
+>>>>>>> 8d391bb1a2c810f4380254bbc9bce5b8f3c48878:LR_2024.py
 
 smplot = smplot.set_index(pd.to_datetime(smplot.Date))
 
@@ -50,8 +54,8 @@ met['Rain_mm_Tot_corr'] = 1.07*met.Rain_mm_Tot
 
 met['et_pm'] = atm.et_penman(met.WS_ms_S_WVT, 90, met.vpd, met.AirTC_Avg, met.net_mod, met['soilf'], met.daytime, timestep=3600)
 
-dat = met
-
+per = slice('20240403','20240815')
+dat = met[per]
 dd = dat.resample("D").mean()
 
 dd['Precipitation'] = dat.resample("D").Rain_mm_Tot_corr.sum()
@@ -67,6 +71,8 @@ wdf = dd[['MinTemp', 'MaxTemp', 'Precipitation', 'ReferenceET' , 'Date']]
 wdf = wdf.reset_index()
 
 wdf = wdf.drop([''], axis=1)
+
+print(wdf)
 
 #######################
 # Aquacrop simulation #
@@ -88,9 +94,20 @@ custom.add_layer(thickness=0.5, thWP=0.10, thFC=0.23, thS=0.42, Ksat=1000, penet
 
 # Initial water content
 
+<<<<<<< HEAD:LR_2024_2.py
 #initWC = InitialWaterContent(wc_type='Num', method='Layer', depth_layer=[1,2,3,4,5], value=[0.12,0.15,0.18,0.18,0.18])
 
 initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['FC','FC','FC','FC','FC'])
+=======
+initWC = InitialWaterContent(wc_type='Prop', method='Layer', depth_layer=[1,2,3,4,5], value=['FC','FC','FC','FC','FC'])
+
+
+# Soil moisture in the plot
+
+sm_dd = smplot.resample("H").mean()
+
+sm_dd.to_csv('sm_dd.csv')
+>>>>>>> 8d391bb1a2c810f4380254bbc9bce5b8f3c48878:LR_2024.py
 
 # AWS soil moisture
 
@@ -100,6 +117,7 @@ dd_measured = dd[period]
 
 measured_met = dd_measured[['VWC_10cm_corr', 'VWC_30cm_corr', 'VWC_50cm_corr']]
 
+<<<<<<< HEAD:LR_2024_2.py
 # Soil moisture in the plot
 
 sm_dd = smplot.resample("D").mean()[period]
@@ -107,13 +125,20 @@ sm_dd = smplot.resample("D").mean()[period]
 sm_dd.to_csv('sm_dd.csv')
 
 # Crop. Maktau Maize is PH1
+=======
+# Crop
+>>>>>>> 8d391bb1a2c810f4380254bbc9bce5b8f3c48878:LR_2024.py
 
 plant_row=11
 plants_per_row=15
 plant_population=(plant_row*plants_per_row)*100 # 100*100=10,000m**2=1ha
 
                
+<<<<<<< HEAD:LR_2024_2.py
 maizePH1=Crop('Maize', planting_date='04/03', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
+=======
+maizePH1=Crop('Maize', planting_date='03/17', PlantMethod=1, CalenderType=1, CGC=0.163, CDC=0.117,
+>>>>>>> 8d391bb1a2c810f4380254bbc9bce5b8f3c48878:LR_2024.py
                Emergence=6, Flowering=13, HIstart=66, YldForm=61, MaxRooting=108, Senescence=107, Maturity=132, HI0=0.48,
                Zmin=0.3, Zmax=1.0, PlantPop=39200, WP=33.7, CCx=0.88,                
                fshape_w1=2.9,fshape_w2=6.0, fshape_w3=2.7)
@@ -175,11 +200,22 @@ outputs_final_stats=[]
 
 sim_start = '2024/04/03'
 
+<<<<<<< HEAD:LR_2024_2.py
 sim_end = '2024/08/15'
 
 model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizePH1,initial_water_content=initWC,
                       irrigation_management=irr_mngt)
 
+=======
+sim_start = '2024/04/03'
+
+sim_end = '2024/08/15'
+
+model = AquaCropModel(sim_start,sim_end,wdf,soil=custom,crop=maizePH1,initial_water_content=initWC,
+                      irrigation_management=irr_mngt) # create model 
+
+'''
+>>>>>>> 8d391bb1a2c810f4380254bbc9bce5b8f3c48878:LR_2024.py
 model._initialize()
 
 while model._clock_struct.model_is_finished is False:

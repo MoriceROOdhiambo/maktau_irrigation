@@ -105,8 +105,6 @@ measured_met = dd_measured[['VWC_10cm_corr', 'VWC_30cm_corr', 'VWC_50cm_corr']]
 
 sm_dd = smplot.resample("D").mean()[period]
 
-sm_dd.to_csv('sm_dd.csv')
-
 # Crop. Maktau Maize is PH1
 
 plant_row=15
@@ -168,7 +166,7 @@ print(outputs_final)
 for i in range(len(outputs_water_flux)):
     modelled_water_flux = pd.DataFrame(outputs_water_flux[i][['dap', 'IrrDay', 'Infl', 'Runoff', 'Es', 'Tr' ]])
 
-modelled_water_flux.to_csv('modelled_water_flux.csv')
+#modelled_water_flux.to_csv('modelled_water_flux.csv')
 
 modelled_water_flux['modelled_ET'] = modelled_water_flux.Es + modelled_water_flux.Tr
 
